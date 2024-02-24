@@ -1,11 +1,17 @@
 {
-  "name": "figma-test",
+  "name": "@xinliang/figma",
   "description": "",
   "version": "1.0.0",
   "main": "src/index.js",
   "type": "module",
   "bin": "src/index.js",
-  "files": ["src/index.js"],
+  "files": [
+    "src/index.js"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "devDependencies": {},
   "scripts": {
     "test": ""
