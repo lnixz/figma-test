@@ -1,12 +1,10 @@
 {
   "name": "@xinliang/figma",
   "description": "",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "src/index.js",
   "type": "module",
-  "bin": {
-    "figma-images": "src/index.js"
-  },
+  "bin": "src/index.js",
   "files": [
     "src/index.js"
   ],
