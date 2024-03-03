@@ -16,6 +16,8 @@
 npm install @xinliang/figma -D
 ```
 
+`@xinliang/figma` 将提供一个 `figma` 命令用来下载图片
+
 
 
 ## 使用方法

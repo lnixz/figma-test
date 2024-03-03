@@ -4,16 +4,17 @@ import axios from 'axios';
 import fs from 'fs-extra';
 import path from 'node:path';
 import chalk from 'chalk';
+import { pathToFileURL } from 'node:url';
 import { Command } from 'commander';
 
 // 读取配置文件和package.json中的配置
-function getConfig() {
+async function getConfig() {
     let config = {};
 
     // 尝试读取package.json中的figma配置
     try {
         const packageJsonPath = path.resolve(process.cwd(), 'package.json');
-        const packageJson = require(packageJsonPath);
+        const packageJson = await fs.readJson(packageJsonPath);
         if (packageJson.figma) {
             config = { ...config, ...packageJson.figma };
         }
@@ -25,8 +26,12 @@ function getConfig() {
     try {
         const configPath = path.resolve(process.cwd(), 'figma.config.js');
         if (fs.existsSync(configPath)) {
-            // figma.config.js中的配置将覆盖package.json中的配置
-            config = { ...config, ...require(configPath) };
+            const configUrl = pathToFileURL(configPath).href;
+            const figmaConfig = await import(configUrl);
+            if (figmaConfig?.default) {
+                // figma.config.js中的配置将覆盖package.json中的配置
+                config = { ...config, ...figmaConfig.default };
+            }
         }
     } catch (error) {
         console.warn(chalk.yellow('无法读取figma.config.js配置文件'));
@@ -46,7 +51,7 @@ program.version('1.0.0')
     .option('-s, --scale [scale]', 'A number between 0.01 and 4, the image scaling factor', 2)
     .option('-f, --format [format]', 'A string enum for the image output format, can be jpg, png, svg, or pdf', 'png')
     .action(async (cmdOptions) => {
-        const fileConfig = getConfig();
+        const fileConfig = await getConfig();
         const options = { ...fileConfig, ...cmdOptions };
         console.log('options:', options);
 
@@ -78,7 +83,7 @@ function getFileIdByURL(urlStr) {
 
 // 下载Figma文件信息
 async function downloadFigmaInfo(options) {
-    const { fileId, pageId, accessToken, imageSavePath } = options;
+    const { fileId, pageId, accessToken, imageSavePath, nodeTypes } = options;
     try {
         console.log(chalk.blue('开始下载文件信息...'));
         const response = await axios.get(`https://api.figma.com/v1/files/${fileId}`, {
