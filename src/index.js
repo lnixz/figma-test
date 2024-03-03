@@ -7,6 +7,21 @@ import chalk from 'chalk';
 import { pathToFileURL } from 'node:url';
 import { Command } from 'commander';
 
+// 初始化命令行工具
+const program = new Command();
+program.version('1.0.0')
+    .option('-u, --url <url>', 'Figma文件的URL')
+    .option('-t, --accessToken <accessToken>', 'Figma访问令牌')
+    .option('-p, --imageSavePath [imageSavePath]', '图片保存路径', './figma/images')
+    .option('-n, --nodeTypes [nodeTypes]', '要下载的节点类型，多个类型用逗号分隔', 'FRAME')
+    .option('-i, --ignoreNodeName [ignoreNodeName]', 'ignore node name')
+    .option('-s, --scale [scale]', 'A number between 0.01 and 4, the image scaling factor', 2)
+    .option('-f, --format [format]', 'A string enum for the image output format, can be jpg, png, svg, or pdf', 'png')
+
+program.parse(process.argv);
+
+const cmdOptions = program.opts();
+
 // 读取配置文件和package.json中的配置
 async function getConfig() {
     let config = {};
@@ -37,40 +52,41 @@ async function getConfig() {
         console.warn(chalk.yellow('无法读取figma.config.js配置文件'));
     }
 
-    return config;
+    // 合并配置，确保命令行参数中的用户输入优先级最高，其次是文件配置，最后是commander的默认值
+    const finalConfig = {
+        ...cmdOptions, // 用户输入的参数
+        ...config, // 文件中的配置
+    };
+
+    // 对于每个有默认值的选项，如果最终配置与默认值相同，则认为用户没有提供输入，使用文件中的配置
+    Object.keys(cmdOptions).forEach(key => {
+        if (cmdOptions[key] === program.getOptionValue(key)) { // 检查是否为默认值
+            finalConfig[key] = config[key] || cmdOptions[key]; // 如果是默认值，则尝试使用文件配置，否则保留默认值
+        }
+    });
+
+    return finalConfig;
 }
 
-// 初始化命令行工具
-const program = new Command();
-program.version('1.0.0')
-    .option('-u, --url <url>', 'Figma文件的URL')
-    .option('-t, --accessToken <accessToken>', 'Figma访问令牌')
-    .option('-p, --imageSavePath [imageSavePath]', '图片保存路径', './figma/images')
-    .option('-n, --nodeTypes [nodeTypes]', '要下载的节点类型，多个类型用逗号分隔', 'FRAME')
-    .option('-i, --ignoreNodeName [ignoreNodeName]', 'ignore node name')
-    .option('-s, --scale [scale]', 'A number between 0.01 and 4, the image scaling factor', 2)
-    .option('-f, --format [format]', 'A string enum for the image output format, can be jpg, png, svg, or pdf', 'png')
-    .action(async (cmdOptions) => {
-        const fileConfig = await getConfig();
-        const options = { ...fileConfig, ...cmdOptions };
-        console.log('options:', options);
+// 获取参数成功回调
+getConfig().then(async (options) => {
+    console.log('options:', options);
 
-        // 检查必要参数
-        if (!options.url || !options.accessToken) {
-            console.error('URL and accessToken are required');
-            process.exit(1);
-        }
+    // 检查必要参数
+    if (!options.url || !options.accessToken) {
+        console.error('URL and accessToken are required');
+        process.exit(1);
+    }
 
-        // 解析文件和页面ID
-        const { fileId, pageId } = getFileIdByURL(options.url);
-        console.log(`fileId: ${fileId}, pageId: ${pageId}`);
-        options.fileId = fileId;
-        options.pageId = pageId;
+    // 解析文件和页面ID
+    const { fileId, pageId } = getFileIdByURL(options.url);
+    console.log(`fileId: ${fileId}, pageId: ${pageId}`);
+    options.fileId = fileId;
+    options.pageId = pageId;
 
-        // 下载Figma信息
-        await downloadFigmaInfo(options);
-    })
-    .parse(process.argv);
+    // 下载Figma信息
+    await downloadFigmaInfo(options);
+});
 
 // 从URL中解析文件ID和页面ID
 function getFileIdByURL(urlStr) {
