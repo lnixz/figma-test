@@ -6,17 +6,50 @@ import path from 'node:path';
 import chalk from 'chalk';
 import { Command } from 'commander';
 
+// 读取配置文件和package.json中的配置
+function getConfig() {
+    let config = {};
+
+    // 尝试读取package.json中的figma配置
+    try {
+        const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+        const packageJson = require(packageJsonPath);
+        if (packageJson.figma) {
+            config = { ...config, ...packageJson.figma };
+        }
+    } catch (error) {
+        console.warn(chalk.yellow('无法读取package.json中的figma配置'));
+    }
+
+    // 尝试读取figma.config.js
+    try {
+        const configPath = path.resolve(process.cwd(), 'figma.config.js');
+        if (fs.existsSync(configPath)) {
+            // figma.config.js中的配置将覆盖package.json中的配置
+            config = { ...config, ...require(configPath) };
+        }
+    } catch (error) {
+        console.warn(chalk.yellow('无法读取figma.config.js配置文件'));
+    }
+
+    return config;
+}
+
 // 初始化命令行工具
 const program = new Command();
 program.version('1.0.0')
-    .option('-u, --url <url>', 'figma file url')
-    .option('-t, --accessToken <accessToken>', 'figma access token')
-    .option('-p, --imageSavePath [imageSavePath]', 'figma file images save path', './figma/images')
+    .option('-u, --url <url>', 'Figma文件的URL')
+    .option('-t, --accessToken <accessToken>', 'Figma访问令牌')
+    .option('-p, --imageSavePath [imageSavePath]', '图片保存路径', './figma/images')
+    .option('-n, --nodeTypes [nodeTypes]', '要下载的节点类型，多个类型用逗号分隔', 'FRAME')
     .option('-i, --ignoreNodeName [ignoreNodeName]', 'ignore node name')
     .option('-s, --scale [scale]', 'A number between 0.01 and 4, the image scaling factor', 2)
     .option('-f, --format [format]', 'A string enum for the image output format, can be jpg, png, svg, or pdf', 'png')
-    .action(async (options) => {
+    .action(async (cmdOptions) => {
+        const fileConfig = getConfig();
+        const options = { ...fileConfig, ...cmdOptions };
         console.log('options:', options);
+
         // 检查必要参数
         if (!options.url || !options.accessToken) {
             console.error('URL and accessToken are required');
@@ -55,10 +88,11 @@ async function downloadFigmaInfo(options) {
         console.log(chalk.green('获取到Figma文件内容...'));
         const fileContent = response.data.document;
 
-        // 过滤出指定页面的FRAME类型节点
+        // 根据用户指定的节点类型过滤节点
+        const typesArray = nodeTypes.split(',').map(type => type.trim().toUpperCase());
         const nodesToRender = fileContent.children
             .filter((item) => item.id === pageId)
-            .flatMap((item) => item.children.filter((child) => child.type === 'FRAME'));
+            .flatMap((item) => item.children.filter((child) => typesArray.includes(child.type)));
 
         console.log(chalk.yellow('检查目录是否存在，不存在则创建目录...'));
         await fs.ensureDir(imageSavePath);
